@@ -50,7 +50,6 @@ function updatePropertyUI(data) {
 
   let html = `<h3>🚗 Araç Bilgileri</h3>`;
   
-  // Tüm alanları kontrol et ve göster
   const fields = [
     { key: 'price', label: 'Fiyat', icon: '💰' },
     { key: 'brand', label: 'Marka', icon: '🏷️' },
@@ -89,7 +88,6 @@ function updatePropertyUI(data) {
     }
   });
 
-  // Hasar bilgileri varsa göster
   if (data.painted_parts && data.painted_parts.length > 0) {
     hasData = true;
     html += `
@@ -152,14 +150,16 @@ async function analyzeWithAI(data) {
         messages: [
           {
             role: 'system',
-            content: 'Sen bir otomobil uzmanısın. Türkiye pazarını iyi biliyorsun. Kullanıcılara yardımcı, dürüst ve detaylı analizler sunuyorsun. Türkçe yanıt ver.'
+            content: `Sen otomobil uzmanısın. Türkiye'de satılan araçları iyi biliyorsun.
+Kullanıcıya kısa, net ve faydalı bilgiler veriyorsun.
+Türkçe yanıt ver. Emoji kullan.`
           },
           {
             role: 'user',
             content: prompt
           }
         ],
-        max_tokens: 1000,
+        max_tokens: 800,
         temperature: 0.7
       })
     });
@@ -174,69 +174,129 @@ async function analyzeWithAI(data) {
     resultTextEl.innerText = analysis;
     resultEl.classList.add('show');
 
+    // Also inject to page
+    injectToPage(analysis);
+
   } catch (error) {
     resultTextEl.innerText = 'Hata oluştu: ' + error.message;
     resultEl.classList.add('show');
   }
 }
 
-function createAnalysisPrompt(data) {
-  let carInfo = 'Araç Bilgileri:\n';
-  
-  const fields = [
-    { key: 'price', label: 'Fiyat' },
-    { key: 'brand', label: 'Marka' },
-    { key: 'series', label: 'Seri' },
-    { key: 'model', label: 'Model' },
-    { key: 'year', label: 'Yıl' },
-    { key: 'kilometer', label: 'Kilometre' },
-    { key: 'fuel_type', label: 'Yakıt Tipi' },
-    { key: 'gear_type', label: 'Vites' },
-    { key: 'body_type', label: 'Kasa Tipi' },
-    { key: 'color', label: 'Renk' },
-    { key: 'engine_power', label: 'Motor Gücü' },
-    { key: 'engine_volume', label: 'Motor Hacmi' },
-    { key: 'traction', label: 'Çekiş' },
-    { key: 'status', label: 'Durumu' },
-    { key: 'warranty', label: 'Garanti' },
-    { key: 'heavy_damage', label: 'Ağır Hasar' },
-    { key: 'plate', label: 'Plaka' },
-    { key: 'from_who', label: 'Kimden' },
-    { key: 'exchange', label: 'Takas' },
-    { key: 'listing_no', label: 'İlan No' },
-    { key: 'listing_date', label: 'İlan Tarihi' },
-  ];
+function injectToPage(analysis) {
+  // Sayfa içine overlay ekle
+  const script = `
+    (function() {
+      // Varsa eski paneli kaldır
+      const existing = document.getElementById('ai-car-panel');
+      if (existing) existing.remove();
 
-  fields.forEach(field => {
-    if (data[field.key]) {
-      carInfo += `- ${field.label}: ${data[field.key]}\n`;
-    }
+      const panel = document.createElement('div');
+      panel.id = 'ai-car-panel';
+      panel.innerHTML = \`
+        <div class="ai-car-header">
+          <span>🤖 AI Analiz</span>
+          <button class="ai-car-close">&times;</button>
+        </div>
+        <div class="ai-car-content">
+          \${analysis.replace(/\\n/g, '<br>')}
+        </div>
+      \`;
+      
+      const style = document.createElement('style');
+      style.textContent = \`
+        #ai-car-panel {
+          position: fixed;
+          bottom: 20px;
+          right: 20px;
+          width: 350px;
+          max-height: 400px;
+          background: white;
+          border-radius: 12px;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+          z-index: 999999;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          overflow: hidden;
+        }
+        #ai-car-panel .ai-car-header {
+          background: linear-gradient(135deg, #667eea, #764ba2);
+          color: white;
+          padding: 12px 15px;
+          font-weight: 600;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        #ai-car-panel .ai-car-close {
+          background: none;
+          border: none;
+          color: white;
+          font-size: 24px;
+          cursor: pointer;
+          line-height: 1;
+        }
+        #ai-car-panel .ai-car-content {
+          padding: 15px;
+          font-size: 13px;
+          line-height: 1.6;
+          color: #333;
+          max-height: 320px;
+          overflow-y: auto;
+        }
+      \`;
+
+      document.head.appendChild(style);
+      document.body.appendChild(panel);
+
+      // Kapatma butonu
+      panel.querySelector('.ai-car-close').addEventListener('click', () => panel.remove());
+    })();
+  `;
+
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    chrome.tabs.executeScript(tabs[0].id, { code: script });
   });
+}
 
-  // Hasar bilgileri
+function createAnalysisPrompt(data) {
+  // Yaşı hesapla
+  const currentYear = 2026;
+  const carYear = parseInt(data.year) || 0;
+  const carAge = currentYear - carYear;
+
+  let carInfo = '';
+  
+  if (data.brand) carInfo += `Marka: ${data.brand}\n`;
+  if (data.series) carInfo += `Seri: ${data.series}\n`;
+  if (data.model) carInfo += `Model: ${data.model}\n`;
+  if (data.year) carInfo += `Yıl: ${data.year} (${carAge} yaşında)\n`;
+  if (data.kilometer) carInfo += `Kilometre: ${data.kilometer} km\n`;
+  if (data.fuel_type) carInfo += `Yakıt: ${data.fuel_type}\n`;
+  if (data.gear_type) carInfo += `Vites: ${data.gear_type}\n`;
+  if (data.engine_volume) carInfo += `Motor: ${data.engine_volume}\n`;
+  if (data.engine_power) carInfo += `Güç: ${data.engine_power}\n`;
+  if (data.color) carInfo += `Renk: ${data.color}\n`;
+  if (data.body_type) carInfo += `Kasa: ${data.body_type}\n`;
   if (data.painted_parts && data.painted_parts.length > 0) {
-    carInfo += `- Boyalı Parçalar: ${data.painted_parts.join(', ')}\n`;
+    carInfo += `Boyalı Parçalar: ${data.painted_parts.join(', ')}\n`;
   }
   if (data.changed_parts && data.changed_parts.length > 0) {
-    carInfo += `- Değişen Parçalar: ${data.changed_parts.join(', ')}\n`;
+    carInfo += `Değişen Parçalar: ${data.changed_parts.join(', ')}\n`;
   }
 
-  carInfo += `\nURL: ${data.url || 'Yok'}`;
-
   return `
-Aşağıdaki araç ilanını detaylı analiz et:
+Aşağıdaki araba hakkında kısa ve faydalı bir analiz yap (maksimum 300 kelime):
 
 ${carInfo}
 
-Lütfen şunları değerlendir:
-1. Bu fiyat hakkında ne düşünüyorsun? (Pahalı/Ucuz/Makul)
-2. Kilometre durumu nasıl? (Düşük/Orta/Yüksek)
-3. Bu aracın avantajları neler?
-4. Dikkat edilmesi gereken noktalar neler?
-5. Boyalı/Değişen parçalar önemli mi?
-6. Genel olarak bu ilanı tavsiye eder misin?
+Şunları söyle:
+1. 🚗 MODELİN ÖZELLİKLERİ: Bu modelin motor kodunu ve şanzıman seçeneklerini söyle
+2. ✅ AVANTAJLARI: Bu aracın güçlü yönleri neler?
+3. ⚠️ DİKKAT: Bu modelin kronik/sık karşılaşılan arızaları neler? (varsa)
+4. 🔧 BAKIM: Bu yaş ve km'de nelere dikkat edilmeli?
+5. 📊 DEĞERLENDİRME: Genel olarak bu ilanı almalı mı?
 
-Kısa ve öz yanıt ver.
+Kısa, madde madde yaz. Gereksiz bilgi verme.
   `;
 }
 
