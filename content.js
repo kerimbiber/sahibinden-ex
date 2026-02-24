@@ -1,45 +1,49 @@
-// content.js - Sahibinden.com Araba Veri Çekme
+// content.js - Sahibinden.com Araba Veri Çekme (Liste + Detay)
 
 console.log("AI Property Helper: Content script loaded");
 
 // Siteye göre veri çekme fonksiyonları
 const extractors = {
-  // Sahibinden.com (Otomobil)
-  'sahibinden.com': {
+  // Sahibinden.com - Detay Sayfası
+  'sahibinden.com-detay': {
+    isDetailPage: () => {
+      return window.location.href.includes('/detay');
+    },
     getPropertyData: () => {
       const data = {
         site: 'sahibinden',
         url: window.location.href,
+        page_type: 'detail',
         
         // Ana bilgiler
         title: '',
         price: '',
         
         // Detaylı bilgiler
-        listing_no: '',        // İlan No
-        listing_date: '',      // İlan Tarihi
-        brand: '',            // Marka
-        series: '',           // Seri
-        model: '',            // Model
-        year: '',             // Yıl
-        fuel_type: '',        // Yakıt Tipi
-        gear_type: '',        // Vites
-        status: '',          // Araç Durumu
-        kilometer: '',       // KM
-        body_type: '',        // Kasa Tipi
-        engine_power: '',     // Motor Gücü
-        engine_volume: '',    // Motor Hacmi
-        traction: '',        // Çekiş
-        color: '',           // Renk
-        warranty: '',        // Garanti
-        heavy_damage: '',    // Ağır Hasar Kayıtlı
-        plate: '',          // Plaka
-        from_who: '',       // Kimden
-        exchange: '',        // Takas
+        listing_no: '',
+        listing_date: '',
+        brand: '',
+        series: '',
+        model: '',
+        year: '',
+        fuel_type: '',
+        gear_type: '',
+        status: '',
+        kilometer: '',
+        body_type: '',
+        engine_power: '',
+        engine_volume: '',
+        traction: '',
+        color: '',
+        warranty: '',
+        heavy_damage: '',
+        plate: '',
+        from_who: '',
+        exchange: '',
         
         // Hasar bilgileri
-        painted_parts: [],    // Boyalı Parçalar
-        changed_parts: [],   // Değişen Parçalar
+        painted_parts: [],
+        changed_parts: [],
         
         details: {},
         rawData: {}
@@ -51,15 +55,14 @@ const extractors = {
         data.price = priceEl?.innerText?.trim() || '';
         
         // Başlık
-        const titleEl = document.querySelector('.classifiedTitle') || 
-                        document.querySelector('h1');
+        const titleEl = document.querySelector('.classifiedTitle') || document.querySelector('h1');
         data.title = titleEl?.innerText?.trim() || '';
 
         // İlan No
         const noEl = document.querySelector('.classifiedId');
         data.listing_no = noEl?.innerText?.trim() || noEl?.dataset?.classifiedid || '';
 
-        // Tüm özellikler (ul.classifiedInfoList içinde)
+        // Tüm özellikler
         const infoList = document.querySelector('ul.classifiedInfoList');
         if (infoList) {
           const items = infoList.querySelectorAll('li');
@@ -70,7 +73,6 @@ const extractors = {
               const key = strong.innerText.trim().replace(/\s+/g, '_').toLowerCase();
               const value = span.innerText.trim();
               
-              // Alanları eşle
               switch(key) {
                 case 'ilan_no': data.listing_no = value; break;
                 case 'ilan_tarihi': data.listing_date = value; break;
@@ -100,39 +102,145 @@ const extractors = {
         // Hasar bilgileri
         const damageList = document.querySelector('.car-damage-info-list');
         if (damageList) {
-          // Boyalı parçalar
-          const paintedTitle = damageList.querySelector('.pair-title.painted-new');
-          if (paintedTitle) {
-            const paintedLis = damageList.querySelectorAll('.selected-damage');
-            data.painted_parts = Array.from(paintedLis).map(li => li.innerText.trim());
-          }
+          const allDmg = damageList.querySelectorAll('li.selected-damage');
+          let foundChanged = false;
+          data.painted_parts = [];
+          data.changed_parts = [];
           
-          // Değişen parçalar
-          const changedTitle = damageList.querySelector('.pair-title.changed-new');
-          if (changedTitle) {
-            const changedLis = damageList.querySelectorAll('.selected-damage');
-            // Değişen parçalar painted'den sonra geliyor, tekrar çek
-            const allDmg = damageList.querySelectorAll('li.selected-damage');
-            let foundChanged = false;
-            data.changed_parts = [];
-            Array.from(allDmg).forEach(li => {
-              if (li.innerText.trim() === 'Değişen Parçalar' || foundChanged) {
-                if (li.innerText.trim() !== 'Değişen Parçalar') {
-                  data.changed_parts.push(li.innerText.trim());
-                }
-                foundChanged = true;
-              }
-            });
-          }
+          allDmg.forEach(li => {
+            const text = li.innerText.trim();
+            if (text === 'Değişen Parçalar') {
+              foundChanged = true;
+            } else if (!foundChanged) {
+              data.painted_parts.push(text);
+            } else {
+              data.changed_parts.push(text);
+            }
+          });
         }
 
-        console.log('Sahibinden data extracted:', data);
+        console.log('Sahibinden DETAIL data extracted:', data);
 
       } catch (e) {
-        console.error('Sahibinden data extraction error:', e);
+        console.error('Sahibinden detail extraction error:', e);
       }
 
       return data;
+    }
+  },
+
+  // Sahibinden.com - Liste Sayfası
+  'sahibinden.com-liste': {
+    isListPage: () => {
+      return window.location.href.includes('/vasita') && !window.location.href.includes('/detay');
+    },
+    getAllListings: () => {
+      const listings = [];
+      
+      try {
+        // Tüm ilan satırlarını bul
+        const rows = document.querySelectorAll('tr.searchResultsItem');
+        
+        rows.forEach(row => {
+          try {
+            const listing = {
+              site: 'sahibinden',
+              page_type: 'list',
+              url: '',
+              listing_no: '',
+              title: '',
+              year: '',
+              kilometer: '',
+              color: '',
+              price: '',
+              location: '',
+              listing_date: '',
+              // Boş alanlar - detay sayfasından doldurulacak
+              brand: '',
+              series: '',
+              model: '',
+              fuel_type: '',
+              gear_type: '',
+              body_type: '',
+              engine_power: '',
+              engine_volume: '',
+              status: '',
+              traction: '',
+              warranty: '',
+              heavy_damage: '',
+              plate: '',
+              from_who: '',
+              exchange: '',
+              painted_parts: [],
+              changed_parts: []
+            };
+
+            // data-id (listing no)
+            listing.listing_no = row.dataset?.id || '';
+
+            // Link ve başlık
+            const linkEl = row.querySelector('a.classifiedTitle');
+            if (linkEl) {
+              listing.title = linkEl.innerText?.trim() || '';
+              listing.url = 'https://www.sahibinden.com' + linkEl.getAttribute('href');
+            }
+
+            // Yıl (genellikle 3. sütun)
+            const yearEl = row.querySelector('td.searchResultsAttributeValue');
+            if (yearEl) {
+              const text = yearEl.innerText?.trim();
+              if (text && /^\d{4}$/.test(text)) {
+                listing.year = text;
+              }
+            }
+
+            // KM (4. sütun)
+            const kmEl = row.querySelectorAll('td.searchResultsAttributeValue')[1];
+            if (kmEl) {
+              listing.kilometer = kmEl.innerText?.trim() || '';
+            }
+
+            // Renk (5. sütun)
+            const colorEl = row.querySelectorAll('td.searchResultsAttributeValue')[2];
+            if (colorEl) {
+              listing.color = colorEl.innerText?.trim() || '';
+            }
+
+            // Fiyat
+            const priceEl = row.querySelector('.classified-price-container span');
+            if (priceEl) {
+              listing.price = priceEl.innerText?.trim() || '';
+            }
+
+            // Tarih
+            const dateEl = row.querySelector('.searchResultsDateValue');
+            if (dateEl) {
+              const spans = dateEl.querySelectorAll('span');
+              if (spans.length >= 2) {
+                listing.listing_date = `${spans[0].innerText?.trim()} ${spans[1].innerText?.trim()}`;
+              }
+            }
+
+            // Konum
+            const locationEl = row.querySelector('.searchResultsLocationValue');
+            if (locationEl) {
+              listing.location = locationEl.innerText?.replace(/\n/g, ', ')?.trim() || '';
+            }
+
+            if (listing.listing_no || listing.title) {
+              listings.push(listing);
+            }
+          } catch (e) {
+            console.error('Error parsing row:', e);
+          }
+        });
+
+        console.log(`Sahibinden LIST: Found ${listings.length} listings`);
+      } catch (e) {
+        console.error('Sahibinden list extraction error:', e);
+      }
+
+      return listings;
     }
   },
 
@@ -167,11 +275,18 @@ const extractors = {
 // Siteye göre doğru extractor'ı seç
 function getCurrentSiteExtractor() {
   const hostname = window.location.hostname;
+  const path = window.location.pathname;
   
-  for (const [site, extractor] of Object.entries(extractors)) {
-    if (hostname.includes(site.replace('www.', ''))) {
-      return extractor;
+  if (hostname.includes('sahibinden.com')) {
+    if (path.includes('/detay')) {
+      return extractors['sahibinden.com-detay'];
+    } else if (path.includes('/vasita')) {
+      return extractors['sahibinden.com-liste'];
     }
+  }
+  
+  if (hostname.includes('arabam.com')) {
+    return extractors['arabam.com'];
   }
   
   return null;
@@ -185,29 +300,61 @@ function sendToExtension(data) {
   });
 }
 
+// Liste verilerini gönder
+function sendListToExtension(listings) {
+  chrome.runtime.sendMessage({
+    type: 'LIST_DATA',
+    data: listings
+  });
+}
+
 // Sayfa yüklendiğinde otomatik çalıştır
 document.addEventListener('DOMContentLoaded', () => {
   console.log('AI Property Helper: DOM ready');
   
-  const checkInterval = setInterval(() => {
-    const extractor = getCurrentSiteExtractor();
-    if (extractor) {
+  const extractor = getCurrentSiteExtractor();
+  
+  if (!extractor) return;
+
+  // Liste sayfası mı detay sayfası mı?
+  if (extractor.isListPage) {
+    // Liste sayfası - tüm ilanları çek
+    const checkInterval = setInterval(() => {
+      const listings = extractor.getAllListings();
+      if (listings.length > 0) {
+        console.log('Listings found:', listings.length);
+        sendListToExtension(listings);
+        clearInterval(checkInterval);
+      }
+    }, 3000);
+    
+    setTimeout(() => clearInterval(checkInterval), 15000);
+  } else {
+    // Detay sayfası
+    const checkInterval = setInterval(() => {
       const data = extractor.getPropertyData();
       if (data.price || data.title || data.listing_no) {
-        console.log('Property data found:', data);
+        console.log('Detail data found:', data);
         sendToExtension(data);
         clearInterval(checkInterval);
       }
-    }
-  }, 3000);
-  
-  setTimeout(() => clearInterval(checkInterval), 30000);
+    }, 3000);
+    
+    setTimeout(() => clearInterval(checkInterval), 30000);
+  }
 });
 
 // MutationObserver ile dinamik içerik kontrolü
 const observer = new MutationObserver((mutations) => {
   const extractor = getCurrentSiteExtractor();
-  if (extractor) {
+  if (!extractor) return;
+
+  if (extractor.isListPage) {
+    const listings = extractor.getAllListings();
+    if (listings.length > 0) {
+      sendListToExtension(listings);
+    }
+  } else {
     const data = extractor.getPropertyData();
     if (data.price || data.title || data.listing_no) {
       sendToExtension(data);
@@ -223,14 +370,22 @@ observer.observe(document.body, {
 
 // Extension'dan gelen mesajları dinle
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  const extractor = getCurrentSiteExtractor();
+  
   if (message.type === 'GET_DATA') {
-    const extractor = getCurrentSiteExtractor();
-    if (extractor) {
+    if (extractor?.getPropertyData) {
       sendResponse(extractor.getPropertyData());
     } else {
       sendResponse({ error: 'Unsupported site' });
     }
+  } else if (message.type === 'GET_LIST') {
+    if (extractor?.getAllListings) {
+      sendResponse(extractor.getAllListings());
+    } else {
+      sendResponse({ error: 'Not a list page' });
+    }
   }
+  
   return true;
 });
 
