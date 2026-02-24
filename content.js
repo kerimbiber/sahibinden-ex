@@ -1,172 +1,132 @@
-// content.js - Araba ve Emlak sitelerinden veri çekme
+// content.js - Sahibinden.com Araba Veri Çekme
 
 console.log("AI Property Helper: Content script loaded");
 
 // Siteye göre veri çekme fonksiyonları
 const extractors = {
-  // Arabam.com
-  'arabam.com': {
-    getPropertyData: () => {
-      const data = {
-        site: 'arabam',
-        url: window.location.href,
-        // Ana bilgiler
-        title: '',
-        price: '',
-        location: '',
-        // Detaylı bilgiler
-        brand_model: '',      // Marka/Model
-        year: '',            // Yıl
-        kilometer: '',       // Kilometre
-        fuel_type: '',       // Yakıt Tipi
-        gear_type: '',       // Vites
-        color: '',           // Renk
-        listing_date: '',    // İlan Tarihi
-        listing_no: '',      // İlan No
-        heavy_damage: '',    // Ağır Hasar Kayıtlı
-        engine_power: '',    // Motor Gücü
-        engine_volume: '',   // Motor Hacmi
-        details: {},
-        rawData: {}
-      };
-
-      try {
-        // Başlık - Birden fazla selector dene
-        const titleEl = document.querySelector('.product-title') || 
-                        document.querySelector('h1.class-name') ||
-                        document.querySelector('h1');
-        data.title = titleEl?.innerText?.trim() || '';
-        
-        // Marka/Model
-        const brandEl = document.querySelector('.brand-model') ||
-                       document.querySelector('[class*="brand"]') ||
-                       document.querySelector('[class*="make"]');
-        data.brand_model = brandEl?.innerText?.trim() || '';
-
-        // Fiyat
-        const priceEl = document.querySelector('.product-price') ||
-                        document.querySelector('[class*="price"]') ||
-                        document.querySelector('.price');
-        data.price = priceEl?.innerText?.trim() || '';
-
-        // Kilometre
-        const kmEl = document.querySelector('[class*="kilometer"]') ||
-                    document.querySelector('[class*="km"]') ||
-                    document.querySelector('[data-testid="kilometer"]');
-        data.kilometer = kmEl?.innerText?.trim() || '';
-
-        // Yakıt Tipi
-        const fuelEl = document.querySelector('[class*="fuel"]') ||
-                      document.querySelector('[data-testid="fuel-type"]');
-        data.fuel_type = fuelEl?.innerText?.trim() || '';
-
-        // Vites
-        const gearEl = document.querySelector('[class*="gear"]') ||
-                      document.querySelector('[class*="transmission"]') ||
-                      document.querySelector('[data-testid="gear"]');
-        data.gear_type = gearEl?.innerText?.trim() || '';
-
-        // Renk
-        const colorEl = document.querySelector('[class*="color"]') ||
-                       document.querySelector('[data-testid="color"]');
-        data.color = colorEl?.innerText?.trim() || '';
-
-        // Konum
-        const locationEl = document.querySelector('[class*="city"]') ||
-                         document.querySelector('[class*="location"]') ||
-                         document.querySelector('.province');
-        data.location = locationEl?.innerText?.trim() || '';
-
-        // Yıl
-        const yearEl = document.querySelector('[class*="year"]') ||
-                      document.querySelector('[data-testid="year"]') ||
-                      document.querySelector('.model-year');
-        data.year = yearEl?.innerText?.trim() || '';
-
-        // İlan Tarihi
-        const dateEl = document.querySelector('[class*="date"]') ||
-                      document.querySelector('[class*="listing-date"]') ||
-                      document.querySelector('.advert-date');
-        data.listing_date = dateEl?.innerText?.trim() || '';
-
-        // İlan No
-        const noEl = document.querySelector('[class*="advert-no"]') ||
-                    document.querySelector('[class*="listing-id"]') ||
-                    document.querySelector('.ad-id');
-        data.listing_no = noEl?.innerText?.trim() || '';
-
-        // Ağır Hasar
-        const damageEl = document.querySelector('[class*="damage"]') ||
-                       document.querySelector('[class*="hasar"]');
-        data.heavy_damage = damageEl?.innerText?.trim() || '';
-
-        // Motor Gücü
-        const powerEl = document.querySelector('[class*="power"]') ||
-                       document.querySelector('[class*="engine-power"]');
-        data.engine_power = powerEl?.innerText?.trim() || '';
-
-        // Motor Hacmi
-        const volumeEl = document.querySelector('[class*="volume"]') ||
-                        document.querySelector('[class*="engine-volume"]') ||
-                        document.querySelector('[class*="cc"]');
-        data.engine_volume = volumeEl?.innerText?.trim() || '';
-
-        // Tüm özellikler (detaylı bilgi)
-        const allFeatures = {};
-        const featureEls = document.querySelectorAll('[class*="spec"]') ||
-                         document.querySelectorAll('.feature-item') ||
-                         document.querySelectorAll('li');
-        featureEls.forEach((el, i) => {
-          const text = el.innerText?.trim();
-          if (text && text.length < 100) {
-            allFeatures[`feature_${i}`] = text;
-          }
-        });
-        data.details = allFeatures;
-
-        // Yedek: tüm sayfa bilgisi
-        data.rawData = {
-          html: document.body.innerHTML.substring(0, 10000),
-          url: window.location.href
-        };
-
-        console.log('Arabam data extracted:', data);
-
-      } catch (e) {
-        console.error('Arabam data extraction error:', e);
-      }
-
-      return data;
-    }
-  },
-
-  // Sahibinden.com (emlak)
+  // Sahibinden.com (Otomobil)
   'sahibinden.com': {
     getPropertyData: () => {
       const data = {
         site: 'sahibinden',
         url: window.location.href,
+        
+        // Ana bilgiler
         title: '',
         price: '',
-        location: '',
+        
+        // Detaylı bilgiler
+        listing_no: '',        // İlan No
+        listing_date: '',      // İlan Tarihi
+        brand: '',            // Marka
+        series: '',           // Seri
+        model: '',            // Model
+        year: '',             // Yıl
+        fuel_type: '',        // Yakıt Tipi
+        gear_type: '',        // Vites
+        status: '',          // Araç Durumu
+        kilometer: '',       // KM
+        body_type: '',        // Kasa Tipi
+        engine_power: '',     // Motor Gücü
+        engine_volume: '',    // Motor Hacmi
+        traction: '',        // Çekiş
+        color: '',           // Renk
+        warranty: '',        // Garanti
+        heavy_damage: '',    // Ağır Hasar Kayıtlı
+        plate: '',          // Plaka
+        from_who: '',       // Kimden
+        exchange: '',        // Takas
+        
+        // Hasar bilgileri
+        painted_parts: [],    // Boyalı Parçalar
+        changed_parts: [],   // Değişen Parçalar
+        
         details: {},
         rawData: {}
       };
 
       try {
+        // Fiyat
+        const priceEl = document.querySelector('.classified-price-wrapper');
+        data.price = priceEl?.innerText?.trim() || '';
+        
+        // Başlık
         const titleEl = document.querySelector('.classifiedTitle') || 
-                        document.querySelector('h1[class*="title"]') ||
                         document.querySelector('h1');
         data.title = titleEl?.innerText?.trim() || '';
 
-        const priceEl = document.querySelector('.priceContainer') ||
-                        document.querySelector('[class*="price"]') ||
-                        document.querySelector('.classifiedPrice');
-        data.price = priceEl?.innerText?.trim() || '';
+        // İlan No
+        const noEl = document.querySelector('.classifiedId');
+        data.listing_no = noEl?.innerText?.trim() || noEl?.dataset?.classifiedid || '';
 
-        const locationEl = document.querySelector('.location') ||
-                           document.querySelector('[class*="location"]');
-        data.location = locationEl?.innerText?.trim() || '';
+        // Tüm özellikler (ul.classifiedInfoList içinde)
+        const infoList = document.querySelector('ul.classifiedInfoList');
+        if (infoList) {
+          const items = infoList.querySelectorAll('li');
+          items.forEach(item => {
+            const strong = item.querySelector('strong');
+            const span = item.querySelector('span:not(.classifiedId)');
+            if (strong && span) {
+              const key = strong.innerText.trim().replace(/\s+/g, '_').toLowerCase();
+              const value = span.innerText.trim();
+              
+              // Alanları eşle
+              switch(key) {
+                case 'ilan_no': data.listing_no = value; break;
+                case 'ilan_tarihi': data.listing_date = value; break;
+                case 'marka': data.brand = value; break;
+                case 'seri': data.series = value; break;
+                case 'model': data.model = value; break;
+                case 'yıl': data.year = value; break;
+                case 'yakıt_tipi': data.fuel_type = value; break;
+                case 'vites': data.gear_type = value; break;
+                case 'araç_durumu': data.status = value; break;
+                case 'km': data.kilometer = value; break;
+                case 'kasa_tipi': data.body_type = value; break;
+                case 'motor_gücü': data.engine_power = value; break;
+                case 'motor_hacmi': data.engine_volume = value; break;
+                case 'çekiş': data.traction = value; break;
+                case 'renk': data.color = value; break;
+                case 'garanti': data.warranty = value; break;
+                case 'ağır_hasar_kayıtlı': data.heavy_damage = value; break;
+                case 'plaka_/_uyruk': data.plate = value; break;
+                case 'kimden': data.from_who = value; break;
+                case 'takas': data.exchange = value; break;
+              }
+            }
+          });
+        }
+
+        // Hasar bilgileri
+        const damageList = document.querySelector('.car-damage-info-list');
+        if (damageList) {
+          // Boyalı parçalar
+          const paintedTitle = damageList.querySelector('.pair-title.painted-new');
+          if (paintedTitle) {
+            const paintedLis = damageList.querySelectorAll('.selected-damage');
+            data.painted_parts = Array.from(paintedLis).map(li => li.innerText.trim());
+          }
+          
+          // Değişen parçalar
+          const changedTitle = damageList.querySelector('.pair-title.changed-new');
+          if (changedTitle) {
+            const changedLis = damageList.querySelectorAll('.selected-damage');
+            // Değişen parçalar painted'den sonra geliyor, tekrar çek
+            const allDmg = damageList.querySelectorAll('li.selected-damage');
+            let foundChanged = false;
+            data.changed_parts = [];
+            Array.from(allDmg).forEach(li => {
+              if (li.innerText.trim() === 'Değişen Parçalar' || foundChanged) {
+                if (li.innerText.trim() !== 'Değişen Parçalar') {
+                  data.changed_parts.push(li.innerText.trim());
+                }
+                foundChanged = true;
+              }
+            });
+          }
+        }
+
+        console.log('Sahibinden data extracted:', data);
 
       } catch (e) {
         console.error('Sahibinden data extraction error:', e);
@@ -176,30 +136,27 @@ const extractors = {
     }
   },
 
-  // Hepsiburada
-  'hepsiburada.com': {
+  // Arabam.com
+  'arabam.com': {
     getPropertyData: () => {
       const data = {
-        site: 'hepsiburada',
+        site: 'arabam',
         url: window.location.href,
         title: '',
         price: '',
-        location: '',
         details: {},
         rawData: {}
       };
 
       try {
-        const titleEl = document.querySelector('h1') ||
-                        document.querySelector('[data-testid="product-title"]');
+        const titleEl = document.querySelector('h1') || document.querySelector('[class*="title"]');
         data.title = titleEl?.innerText?.trim() || '';
 
-        const priceEl = document.querySelector('[data-testid="product-price"]') ||
-                        document.querySelector('[class*="price"]');
+        const priceEl = document.querySelector('[class*="price"]') || document.querySelector('.product-price');
         data.price = priceEl?.innerText?.trim() || '';
 
       } catch (e) {
-        console.error('Hepsiburada data extraction error:', e);
+        console.error('Arabam data extraction error:', e);
       }
 
       return data;
@@ -236,7 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const extractor = getCurrentSiteExtractor();
     if (extractor) {
       const data = extractor.getPropertyData();
-      if (data.title || data.price || data.brand_model) {
+      if (data.price || data.title || data.listing_no) {
         console.log('Property data found:', data);
         sendToExtension(data);
         clearInterval(checkInterval);
@@ -252,7 +209,7 @@ const observer = new MutationObserver((mutations) => {
   const extractor = getCurrentSiteExtractor();
   if (extractor) {
     const data = extractor.getPropertyData();
-    if (data.title || data.price || data.brand_model) {
+    if (data.price || data.title || data.listing_no) {
       sendToExtension(data);
     }
   }

@@ -2,14 +2,12 @@
 
 let currentPropertyData = null;
 
-// DOM elementleri
 const propertyInfoEl = document.getElementById('propertyInfo');
 const analyzeBtn = document.getElementById('analyzeBtn');
 const loadingEl = document.getElementById('loading');
 const resultEl = document.getElementById('result');
 const resultTextEl = document.getElementById('resultText');
 
-// API Key'i storage'dan al
 async function getApiKey() {
   return new Promise((resolve) => {
     chrome.storage.local.get(['apiKey', 'apiProvider'], (result) => {
@@ -18,7 +16,6 @@ async function getApiKey() {
   });
 }
 
-// API Provider'ı storage'dan al
 async function getApiProvider() {
   return new Promise((resolve) => {
     chrome.storage.local.get(['apiProvider'], (result) => {
@@ -27,7 +24,6 @@ async function getApiProvider() {
   });
 }
 
-// Mevcut sekmeden veri çek
 async function getCurrentTabData() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   
@@ -38,7 +34,6 @@ async function getCurrentTabData() {
   });
 }
 
-// UI'ı veri ile güncelle
 function updatePropertyUI(data) {
   if (data.error) {
     propertyInfoEl.innerHTML = `
@@ -53,24 +48,31 @@ function updatePropertyUI(data) {
 
   currentPropertyData = data;
 
-  // Araba bilgilerini göster
   let html = `<h3>🚗 Araç Bilgileri</h3>`;
   
   // Tüm alanları kontrol et ve göster
   const fields = [
-    { key: 'brand_model', label: 'Marka/Model', icon: '🏷️' },
     { key: 'price', label: 'Fiyat', icon: '💰' },
+    { key: 'brand', label: 'Marka', icon: '🏷️' },
+    { key: 'series', label: 'Seri', icon: '🏷️' },
+    { key: 'model', label: 'Model', icon: '🏷️' },
     { key: 'year', label: 'Yıl', icon: '📅' },
-    { key: 'kilometer', label: 'Kilometre', icon: '🛣️' },
+    { key: 'kilometer', label: 'KM', icon: '🛣️' },
     { key: 'fuel_type', label: 'Yakıt', icon: '⛽' },
     { key: 'gear_type', label: 'Vites', icon: '⚙️' },
+    { key: 'body_type', label: 'Kasa', icon: '🚗' },
     { key: 'color', label: 'Renk', icon: '🎨' },
-    { key: 'location', label: 'Konum', icon: '📍' },
-    { key: 'listing_date', label: 'İlan Tarihi', icon: '📆' },
-    { key: 'listing_no', label: 'İlan No', icon: '🔢' },
-    { key: 'heavy_damage', label: 'Ağır Hasar', icon: '⚠️' },
     { key: 'engine_power', label: 'Motor Gücü', icon: '🐎' },
     { key: 'engine_volume', label: 'Motor Hacmi', icon: '🔧' },
+    { key: 'traction', label: 'Çekiş', icon: '🔩' },
+    { key: 'status', label: 'Durumu', icon: '✅' },
+    { key: 'warranty', label: 'Garanti', icon: '🛡️' },
+    { key: 'heavy_damage', label: 'Ağır Hasar', icon: '⚠️' },
+    { key: 'plate', label: 'Plaka', icon: '🔢' },
+    { key: 'from_who', label: 'Kimden', icon: '👤' },
+    { key: 'exchange', label: 'Takas', icon: '🔄' },
+    { key: 'listing_no', label: 'İlan No', icon: '📋' },
+    { key: 'listing_date', label: 'İlan Tarihi', icon: '📆' },
   ];
 
   let hasData = false;
@@ -87,6 +89,27 @@ function updatePropertyUI(data) {
     }
   });
 
+  // Hasar bilgileri varsa göster
+  if (data.painted_parts && data.painted_parts.length > 0) {
+    hasData = true;
+    html += `
+      <div class="property-row damage-row">
+        <span class="label">🎨 Boyalı</span>
+        <span class="value damage">${data.painted_parts.join(', ')}</span>
+      </div>
+    `;
+  }
+  
+  if (data.changed_parts && data.changed_parts.length > 0) {
+    hasData = true;
+    html += `
+      <div class="property-row damage-row">
+        <span class="label">🔧 Değişen</span>
+        <span class="value damage">${data.changed_parts.join(', ')}</span>
+      </div>
+    `;
+  }
+
   if (!hasData) {
     html += `
       <div class="no-data">
@@ -102,7 +125,6 @@ function updatePropertyUI(data) {
   propertyInfoEl.innerHTML = html;
 }
 
-// AI analizi yap
 async function analyzeWithAI(data) {
   const apiKey = await getApiKey();
   const apiProvider = await getApiProvider();
@@ -113,20 +135,10 @@ async function analyzeWithAI(data) {
     return;
   }
 
-  // AI için prompt oluştur
   const prompt = createAnalysisPrompt(data);
 
-  let apiUrl = 'https://api.openai.com/v1/chat/completions';
-  let model = 'gpt-4o-mini';
-
-  if (apiProvider === 'deepseek') {
-    apiUrl = 'https://api.deepseek.com/v1/chat/completions';
-    model = 'deepseek-chat';
-  } else if (apiProvider === 'anthropic' || apiProvider === 'google') {
-    resultTextEl.innerText = 'Şu anda DeepSeek kullanıyoruz. Ayarlardan DeepSeek seçili olduğundan emin olun.';
-    resultEl.classList.add('show');
-    return;
-  }
+  let apiUrl = 'https://api.deepseek.com/v1/chat/completions';
+  let model = 'deepseek-chat';
 
   try {
     const response = await fetch(apiUrl, {
@@ -168,25 +180,31 @@ async function analyzeWithAI(data) {
   }
 }
 
-// Analiz promptu oluştur
 function createAnalysisPrompt(data) {
-  // Mevcut bilgileri formatla
   let carInfo = 'Araç Bilgileri:\n';
   
   const fields = [
-    { key: 'brand_model', label: 'Marka/Model' },
     { key: 'price', label: 'Fiyat' },
+    { key: 'brand', label: 'Marka' },
+    { key: 'series', label: 'Seri' },
+    { key: 'model', label: 'Model' },
     { key: 'year', label: 'Yıl' },
     { key: 'kilometer', label: 'Kilometre' },
     { key: 'fuel_type', label: 'Yakıt Tipi' },
     { key: 'gear_type', label: 'Vites' },
+    { key: 'body_type', label: 'Kasa Tipi' },
     { key: 'color', label: 'Renk' },
-    { key: 'location', label: 'Konum' },
-    { key: 'listing_date', label: 'İlan Tarihi' },
-    { key: 'listing_no', label: 'İlan No' },
-    { key: 'heavy_damage', label: 'Ağır Hasar' },
     { key: 'engine_power', label: 'Motor Gücü' },
     { key: 'engine_volume', label: 'Motor Hacmi' },
+    { key: 'traction', label: 'Çekiş' },
+    { key: 'status', label: 'Durumu' },
+    { key: 'warranty', label: 'Garanti' },
+    { key: 'heavy_damage', label: 'Ağır Hasar' },
+    { key: 'plate', label: 'Plaka' },
+    { key: 'from_who', label: 'Kimden' },
+    { key: 'exchange', label: 'Takas' },
+    { key: 'listing_no', label: 'İlan No' },
+    { key: 'listing_date', label: 'İlan Tarihi' },
   ];
 
   fields.forEach(field => {
@@ -194,6 +212,14 @@ function createAnalysisPrompt(data) {
       carInfo += `- ${field.label}: ${data[field.key]}\n`;
     }
   });
+
+  // Hasar bilgileri
+  if (data.painted_parts && data.painted_parts.length > 0) {
+    carInfo += `- Boyalı Parçalar: ${data.painted_parts.join(', ')}\n`;
+  }
+  if (data.changed_parts && data.changed_parts.length > 0) {
+    carInfo += `- Değişen Parçalar: ${data.changed_parts.join(', ')}\n`;
+  }
 
   carInfo += `\nURL: ${data.url || 'Yok'}`;
 
@@ -207,19 +233,18 @@ Lütfen şunları değerlendir:
 2. Kilometre durumu nasıl? (Düşük/Orta/Yüksek)
 3. Bu aracın avantajları neler?
 4. Dikkat edilmesi gereken noktalar neler?
-5. Genel olarak bu ilanı tavsiye eder misin?
+5. Boyalı/Değişen parçalar önemli mi?
+6. Genel olarak bu ilanı tavsiye eder misin?
 
 Kısa ve öz yanıt ver.
   `;
 }
 
-// Settings link
 document.getElementById('settingsLink').addEventListener('click', (e) => {
   e.preventDefault();
   chrome.runtime.openOptionsPage();
 });
 
-// Event Listeners
 document.addEventListener('DOMContentLoaded', async () => {
   try {
     const data = await getCurrentTabData();
@@ -246,7 +271,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 });
 
-// Sayfa değiştiğinde veriyi yenile
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
   try {
     const data = await getCurrentTabData();
