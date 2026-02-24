@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "AI Emlak Asistanı",
+  "version": "1.0.0",
+  "description": "Sahibinden ve emlak ilanlarını AI ile analiz et. Fiyat değerlendirmesi, bölge karşılaştırması ve yapay zeka önerileri.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "*://*.sahibinden.com/*",
+    "*://*.arabam.com/*",
+    "*://*.hepsiburada.com/*",
+    "*://*.emlakjet.com/*",
+    "*://*.zingat.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.sahibinden.com/*",
+        "*://*.arabam.com/*",
+        "*://*.hepsiburada.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "options.html",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
