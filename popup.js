@@ -151,8 +151,8 @@ async function analyzeWithAI(data) {
           {
             role: 'system',
             content: `Sen otomobil uzmanısın. Türkiye'de satılan araçları iyi biliyorsun.
-Kullanıcıya kısa, net ve faydalı bilgiler veriyorsun.
-Türkçe yanıt ver. Emoji kullan.`
+Sadece motor kodu ve kronik arızalar hakkında bilgi veriyorsun.
+Çok kısa ve net yanıt ver. Gereksiz bilgi verme.`
           },
           {
             role: 'user',
@@ -285,18 +285,14 @@ function createAnalysisPrompt(data) {
   }
 
   return `
-Aşağıdaki araba hakkında kısa ve faydalı bir analiz yap (maksimum 300 kelime):
+Aşağıdaki araba hakkında sadece şu 2 konuyu söyle (çok kısa, max 200 kelime):
 
 ${carInfo}
 
-Şunları söyle:
-1. 🚗 MODELİN ÖZELLİKLERİ: Bu modelin motor kodunu ve şanzıman seçeneklerini söyle
-2. ✅ AVANTAJLARI: Bu aracın güçlü yönleri neler?
-3. ⚠️ DİKKAT: Bu modelin kronik/sık karşılaşılan arızaları neler? (varsa)
-4. 🔧 BAKIM: Bu yaş ve km'de nelere dikkat edilmeli?
-5. 📊 DEĞERLENDİRME: Genel olarak bu ilanı almalı mı?
+1. 🔧 MOTOR KODU: Bu aracın motor kodu nedir? (Örn: MPI, TSI, EcoBoost vb.)
+2. ⚠️ KRONİK ARIZALAR: Bu modelde en sık karşılaşılan sorunlar neler?
 
-Kısa, madde madde yaz. Gereksiz bilgi verme.
+Sadece bu iki maddeyi yaz. Başka şey istemiyorum.
   `;
 }
 
